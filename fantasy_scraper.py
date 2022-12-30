@@ -1,3 +1,4 @@
+import asyncio
 import os
 import random
 import time
@@ -7,38 +8,42 @@ import pypandoc
 from bs4 import BeautifulSoup
 from requests import ReadTimeout
 
-# categories = [2, 3, 4, 5, 6, 8, 43, 54, 74, 75, 91]
-categories = [3, 4, 5, 6, 8, 43, 54, 74, 75, 91]
+categories = [2, 3, 4, 5, 6, 8, 43, 54, 74, 75, 91]
 basic_url = "http://book-online.com.ua/index.php?cat="
 blocker = "Доступ к книге заблокирован по требованию правообладателя!"
+book_text_url = ""
+filename_tmp = ""
+last_book_page_tmp = ""
+pagenum = 0
 
 
-def request_categories():
+async def request_categories():
+    session = requests.Session()
     for i in categories:
         url = f"{basic_url}{i}"
         try:
-            bs = parse_page(url)
+            bs = parse_page(url, session)
         except ReadTimeout:
             __sleep()
             print("Have to sleep")
-            bs = parse_page(url)
+            bs = parse_page(url, session)
         last_link = get_last_page(bs)
-        paginate(last_link, url)
+        paginate(last_link, url, session)
 
 
-def paginate(last_link, url):
+def paginate(last_link, url, session):
     last_link_range = int(last_link) + 1
     time.sleep(random.randint(1, 120))
     for i in range(1, last_link_range):
         try:
-            soup = parse_page(f"{url}&page={i}")
+            soup = parse_page(f"{url}&page={i}", session)
         except ReadTimeout:
             __sleep()
-            soup = parse_page(f"{url}&page={i}")
+            soup = parse_page(f"{url}&page={i}", session)
         blocks = soup.find_all("div", {"class": "block1"})
         for block in blocks:
             book_data = block.find_all("a")
-            get_books(book_data)
+            get_books(book_data, session)
 
 
 def save_to_file(filename, text):
@@ -47,8 +52,8 @@ def save_to_file(filename, text):
         bk.write("<pre>" + text + "</pre> <br>\n")
 
 
-def parse_page(url):
-    resp = requests.get(url)
+def parse_page(url, session):
+    resp = session.get(url)
     return BeautifulSoup(resp.text, "html.parser")
 
 
@@ -57,32 +62,37 @@ def get_last_page(soup_object):
     return last_page.find_all("a")[-1].text
 
 
-def get_book_text(url):
+def get_book_text(url, session):
     try:
-        soup = parse_page(url)
-        return soup.find("div", {"id": "ptext"}).text
-    except ReadTimeout:
+        soup = parse_page(url, session)
+    except Exception:
         __sleep()
-        get_book_text(url)
+        soup = parse_page(url, session)
+    return soup.find("div", {"id": "ptext"}).text
 
 
-def get_books(book_data):
+def get_books(book_data, session):
     book = book_data[3]["href"]
-    book_text = get_book_text(book)
+    book_text = get_book_text(book, session)
     book_name = book_data[0].text
     author = book_data[1].text
     category = book_data[2].text
     filename = f"{category}__{author}-{book_name}"
     if blocker not in book_text:
         try:
-            soup = parse_page(book)
+            soup = parse_page(book, session)
         except ReadTimeout:
-            soup = parse_page(book)
+            soup = parse_page(book, session)
         last_book_page = int(get_last_page(soup)) + 1
         for i in range(1, last_book_page):
-            book_text = get_book_text(f"{book}&page={i}")
-            save_to_file(filename, book_text)
-            print(f"{filename}: page: {i}/{last_book_page}")
+            book_text_url_temp = f"{book}&page={i}"
+            try:
+                __get_text(book_text_url_temp, filename, last_book_page, i, session)
+            except KeyboardInterrupt:
+                book_text_url = book_text_url_temp
+                filename_tmp = filename
+                last_book_page_tmp = last_book_page
+                pagenum = i
         pypandoc.convert_file(f"{filename}.html", 'epub', outputfile=f"{filename}.epub")
         os.remove(f"{filename}.html")
 
@@ -92,9 +102,20 @@ def get_books(book_data):
 
 
 def __sleep():
-    time.sleep(30)
+    time.sleep(180)
     print("Have to sleep")
 
 
+def __get_text(book_text_url_tmp, filename, last_book_page, pagenum, session):
+    book_text = get_book_text(book_text_url_tmp, session)
+    save_to_file(filename, book_text)
+    print(f"{filename}: page: {pagenum}/{last_book_page}")
+
+
 if __name__ == '__main__':
-    request_categories()
+    if book_text_url != "":
+        session = requests.Session()
+        __get_text(book_text_url, filename_tmp, last_book_page_tmp, pagenum, session)
+        asyncio.get_event_loop().run_until_complete(request_categories())
+    else:
+        asyncio.get_event_loop().run_until_complete(request_categories())
