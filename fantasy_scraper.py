@@ -2,13 +2,15 @@ import asyncio
 import os
 import random
 import time
+from types import NoneType
 
 import requests
 import pypandoc
 from bs4 import BeautifulSoup
 from requests import ReadTimeout
 
-categories = [2, 3, 4, 5, 6, 8, 43, 54, 74, 75, 91]
+# categories = [2, 4, 5, 6, 8, 43, 54, 74, 75, 91]
+categories = [75, 91, 2]
 basic_url = "http://book-online.com.ua/index.php?cat="
 blocker = "Доступ к книге заблокирован по требованию правообладателя!"
 book_text_url = ""
@@ -27,13 +29,16 @@ async def request_categories():
             __sleep()
             print("Have to sleep")
             bs = parse_page(url, session)
-        last_link = get_last_page(bs)
-        paginate(last_link, url, session)
+        try:
+            time.sleep(2)
+            last_link = get_last_page(bs)
+            paginate(last_link, url, session)
+        except Exception:
+            pass
 
 
 def paginate(last_link, url, session):
     last_link_range = int(last_link) + 1
-    time.sleep(random.randint(1, 120))
     for i in range(1, last_link_range):
         try:
             soup = parse_page(f"{url}&page={i}", session)
@@ -77,7 +82,7 @@ def get_books(book_data, session):
     book_name = book_data[0].text
     author = book_data[1].text
     category = book_data[2].text
-    filename = f"{category}__{author}-{book_name}"
+    filename = f"{category}__{author}-{book_name}".replace("[", "").replace("]", "")
     if blocker not in book_text:
         try:
             soup = parse_page(book, session)
@@ -94,7 +99,10 @@ def get_books(book_data, session):
                 last_book_page_tmp = last_book_page
                 pagenum = i
         pypandoc.convert_file(f"{filename}.html", 'epub', outputfile=f"{filename}.epub")
-        os.remove(f"{filename}.html")
+        try:
+            os.remove(f"{filename}.html")
+        except Exception:
+            pass
 
     else:
         print(f"{filename} - Ignored")
@@ -108,7 +116,7 @@ def __sleep():
 
 def __get_text(book_text_url_tmp, filename, last_book_page, pagenum, session):
     book_text = get_book_text(book_text_url_tmp, session)
-    save_to_file(filename, book_text)
+    save_to_file(filename.replace("[", "").replace("]", ""), book_text)
     print(f"{filename}: page: {pagenum}/{last_book_page}")
 
 
