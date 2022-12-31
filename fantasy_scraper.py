@@ -1,16 +1,13 @@
 import asyncio
 import os
-import random
 import time
-from types import NoneType
 
 import requests
 import pypandoc
 from bs4 import BeautifulSoup
 from requests import ReadTimeout
 
-# categories = [2, 4, 5, 6, 8, 43, 54, 74, 75, 91]
-categories = [75, 91, 2]
+categories = [4, 5, 6, 8, 43, 54, 74, 75, 91, 2]
 basic_url = "http://book-online.com.ua/index.php?cat="
 blocker = "Доступ к книге заблокирован по требованию правообладателя!"
 book_text_url = ""
