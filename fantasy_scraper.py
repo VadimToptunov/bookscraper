@@ -1,11 +1,10 @@
 import asyncio
 import os
-import time
 import requests
 import pypandoc
-from bs4 import BeautifulSoup
 from requests import ReadTimeout
 from tqdm import tqdm
+from common import *
 
 categories = [4, 5, 6, 8, 43, 54, 74, 75, 91, 2]
 basic_url = "http://book-online.com.ua/index.php?cat="
@@ -23,14 +22,15 @@ async def request_categories():
         try:
             bs = parse_page(url, session)
         except ReadTimeout:
-            __sleep()
+            sleep()
             print("Have to sleep")
             bs = parse_page(url, session)
         try:
             time.sleep(2)
             last_link = get_last_page(bs)
             paginate(last_link, url, session)
-        except Exception:
+        except Exception as ex:
+            print(ex)
             pass
 
 
@@ -40,37 +40,12 @@ def paginate(last_link, url, session):
         try:
             soup = parse_page(f"{url}&page={i}", session)
         except ReadTimeout:
-            __sleep()
+            sleep()
             soup = parse_page(f"{url}&page={i}", session)
         blocks = soup.find_all("div", {"class": "block1"})
         for block in blocks:
             book_data = block.find_all("a")
             get_books(book_data, session)
-
-
-def save_to_file(filename, text):
-    txt_filename = f"{filename}.html"
-    with open(txt_filename, "a") as bk:
-        bk.write("<pre>" + text + "</pre> <br>\n")
-
-
-def parse_page(url, session):
-    resp = session.get(url)
-    return BeautifulSoup(resp.text, "html.parser")
-
-
-def get_last_page(soup_object):
-    last_page = soup_object.find("div", {"id": "div_paginator"})
-    return last_page.find_all("a")[-1].text
-
-
-def get_book_text(url, session):
-    try:
-        soup = parse_page(url, session)
-    except Exception:
-        __sleep()
-        soup = parse_page(url, session)
-    return soup.find("div", {"id": "ptext"}).text
 
 
 def get_books(book_data, session):
@@ -90,7 +65,7 @@ def get_books(book_data, session):
         for page in tqdm(range(1, last_book_page), ascii=True):
             book_text_url_temp = f"{book}&page={page}"
             try:
-                __get_text(book_text_url_temp, filename, session)
+                get_text(book_text_url_temp, filename, session)
             except KeyboardInterrupt:
                 book_text_url = book_text_url_temp
                 filename_tmp = filename
@@ -100,7 +75,8 @@ def get_books(book_data, session):
         pypandoc.convert_file(f"{filename}.html", 'epub', outputfile=f"{filename}.epub")
         try:
             os.remove(f"{filename}.html")
-        except Exception:
+        except Exception as ex:
+            print(ex)
             pass
 
     else:
@@ -108,20 +84,14 @@ def get_books(book_data, session):
         pass
 
 
-def __sleep():
-    time.sleep(180)
-    print("Have to sleep")
-
-
-def __get_text(book_text_url_tmp, filename, session):
-    book_text = get_book_text(book_text_url_tmp, session)
-    save_to_file(filename.replace("[", "").replace("]", ""), book_text)
-
-
-if __name__ == '__main__':
+def main():
     if book_text_url != "":
         session = requests.Session()
-        __get_text(book_text_url, filename_tmp, session)
+        get_text(book_text_url, filename_tmp, session)
         asyncio.get_event_loop().run_until_complete(request_categories())
     else:
         asyncio.get_event_loop().run_until_complete(request_categories())
+
+
+if __name__ == '__main__':
+    main()
