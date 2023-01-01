@@ -6,9 +6,10 @@ from requests import ReadTimeout
 from tqdm import tqdm
 from common import *
 
-categories = [4, 5, 6, 8, 43, 54, 74, 75, 91, 2]
-basic_url = "http://book-online.com.ua/index.php?cat="
-blocker = "Доступ к книге заблокирован по требованию правообладателя!"
+CATEGORIES = [4, 5, 6, 8, 43, 54, 74, 75, 91, 2]
+BASIC_URL = "http://book-online.com.ua/index.php?cat="
+BLOCKER = "Доступ к книге заблокирован по требованию правообладателя!"
+
 book_text_url = ""
 filename_tmp = ""
 last_book_page_tmp = ""
@@ -17,8 +18,8 @@ pagenum = 0
 
 async def request_categories():
     session = requests.Session()
-    for i in categories:
-        url = f"{basic_url}{i}"
+    for i in CATEGORIES:
+        url = f"{BASIC_URL}{i}"
         try:
             bs = parse_page(url, session)
         except ReadTimeout:
@@ -55,7 +56,7 @@ def get_books(book_data, session):
     author = book_data[1].text
     category = book_data[2].text
     filename = f"{category}__{author}-{book_name}".replace("[", "").replace("]", "")
-    if blocker not in book_text:
+    if BLOCKER not in book_text:
         print(f"{filename}")
         try:
             soup = parse_page(book, session)
