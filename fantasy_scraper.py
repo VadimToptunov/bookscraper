@@ -5,6 +5,7 @@ import requests
 import pypandoc
 from bs4 import BeautifulSoup
 from requests import ReadTimeout
+from tqdm import tqdm
 
 categories = [4, 5, 6, 8, 43, 54, 74, 75, 91, 2]
 basic_url = "http://book-online.com.ua/index.php?cat="
@@ -80,20 +81,22 @@ def get_books(book_data, session):
     category = book_data[2].text
     filename = f"{category}__{author}-{book_name}".replace("[", "").replace("]", "")
     if blocker not in book_text:
+        print(f"{filename}")
         try:
             soup = parse_page(book, session)
         except ReadTimeout:
             soup = parse_page(book, session)
         last_book_page = int(get_last_page(soup)) + 1
-        for i in range(1, last_book_page):
-            book_text_url_temp = f"{book}&page={i}"
+        for page in tqdm(range(1, last_book_page), ascii=True):
+            book_text_url_temp = f"{book}&page={page}"
             try:
-                __get_text(book_text_url_temp, filename, last_book_page, i, session)
+                __get_text(book_text_url_temp, filename, session)
             except KeyboardInterrupt:
                 book_text_url = book_text_url_temp
                 filename_tmp = filename
                 last_book_page_tmp = last_book_page
-                pagenum = i
+                pagenum = page
+            pass
         pypandoc.convert_file(f"{filename}.html", 'epub', outputfile=f"{filename}.epub")
         try:
             os.remove(f"{filename}.html")
@@ -110,16 +113,15 @@ def __sleep():
     print("Have to sleep")
 
 
-def __get_text(book_text_url_tmp, filename, last_book_page, pagenum, session):
+def __get_text(book_text_url_tmp, filename, session):
     book_text = get_book_text(book_text_url_tmp, session)
     save_to_file(filename.replace("[", "").replace("]", ""), book_text)
-    print(f"{filename}: page: {pagenum}/{last_book_page}")
 
 
 if __name__ == '__main__':
     if book_text_url != "":
         session = requests.Session()
-        __get_text(book_text_url, filename_tmp, last_book_page_tmp, pagenum, session)
+        __get_text(book_text_url, filename_tmp, session)
         asyncio.get_event_loop().run_until_complete(request_categories())
     else:
         asyncio.get_event_loop().run_until_complete(request_categories())
